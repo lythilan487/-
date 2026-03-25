@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { toPng } from 'html-to-image';
+import html2canvas from 'html2canvas';
 import { Upload, Download, RefreshCw, Type, Palette, Trash2, Italic, Underline, Strikethrough, Undo2, Redo2, SlidersHorizontal, ChevronRight, Mic, MicOff, X, RotateCw } from 'lucide-react';
 import { cn } from './lib/utils';
 
@@ -156,39 +156,6 @@ export default function App() {
     img.src = imageUrl;
   }, [imageUrl, imageStyle.brightness, imageStyle.contrast, imageStyle.saturation, imageStyle.rotate]);
 
-  const handleDownload = useCallback(async () => {
-    if (exportRef.current === null) return;
-    
-    setIsSaving(true);
-    try {
-      const rect = exportRef.current.getBoundingClientRect();
-      const exportOptions = {
-        cacheBust: true,
-        skipFonts: false,
-        width: rect.width,
-        height: rect.height,
-        style: { margin: '0', padding: '0' }
-      };
-
-      // iOS Safari workaround: Call toPng twice.
-      // The first call forces the browser to load the image into the canvas context.
-      await toPng(exportRef.current, exportOptions);
-      // Small delay to ensure rendering is complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      const dataUrl = await toPng(exportRef.current, { 
-        ...exportOptions,
-        pixelRatio: 2,
-      });
-      setGeneratedImage(dataUrl);
-    } catch (err) {
-      console.error('Failed to export image', err);
-      alert('生成图片失败，请重试');
-    } finally {
-      setIsSaving(false);
-    }
-  }, [exportRef]);
-
   const toggleListening = () => {
     if (!recognitionRef.current) {
       alert("您的浏览器不支持语音输入功能，请尝试使用 Chrome 或 Safari。");
@@ -238,25 +205,17 @@ export default function App() {
     
     setIsSaving(true);
     try {
-      const rect = exportRef.current.getBoundingClientRect();
-      const exportOptions = {
-        cacheBust: true,
-        skipFonts: false,
-        width: rect.width,
-        height: rect.height,
-        style: { margin: '0', padding: '0' }
-      };
-
-      // iOS Safari workaround: Call toPng twice.
-      // The first call forces the browser to load the image into the canvas context.
-      await toPng(exportRef.current, exportOptions);
       // Small delay to ensure rendering is complete
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      const dataUrl = await toPng(exportRef.current, { 
-        ...exportOptions,
-        pixelRatio: 2,
+      const canvas = await html2canvas(exportRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
       });
+      
+      const dataUrl = canvas.toDataURL('image/png');
       setGeneratedImage(dataUrl);
     } catch (err) {
       console.error('Failed to export image', err);
@@ -701,7 +660,16 @@ export default function App() {
                   <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-200">
                     {/* Aspect Ratio */}
                     <div className="space-y-3">
-                      <span className="text-xs text-neutral-500">图片比例</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-neutral-500">图片比例</span>
+                        <button
+                          onClick={() => setImageStyle(s => ({ ...s, rotate: (s.rotate + 90) % 360 }))}
+                          className="flex items-center gap-1.5 px-2 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded transition-colors text-xs font-medium"
+                        >
+                          <RotateCw className="w-3 h-3" />
+                          旋转 90°
+                        </button>
+                      </div>
                       <div className="flex bg-neutral-100 rounded-lg p-1 flex-wrap gap-1">
                         {['original', '1:1', '3:4', '4:3', '9:16', '16:9'].map(ratio => (
                           <button
