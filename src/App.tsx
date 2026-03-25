@@ -196,7 +196,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-900 flex justify-center font-sans sm:p-4">
-      <div className="w-full max-w-[430px] bg-neutral-50 flex flex-col h-[100dvh] sm:h-[calc(100vh-2rem)] sm:rounded-[2.5rem] shadow-2xl relative overflow-hidden sm:border-[8px] border-neutral-800">
+      <div className="w-full max-w-[430px] bg-neutral-50 flex flex-col h-screen h-[100dvh] sm:h-[calc(100vh-2rem)] sm:rounded-[2.5rem] shadow-2xl relative overflow-hidden sm:border-[8px] border-neutral-800">
         <header className="bg-white border-b border-neutral-200 px-4 py-3 flex items-center justify-between shrink-0 z-10">
           <h1 className="text-lg font-bold text-neutral-800 flex items-center gap-1.5">
             <Type className="w-5 h-5 text-red-500" />
