@@ -1,5 +1,5 @@
 {
-  "name": "小红书图文神器",
+  "name": "画里有话",
   "description": "自动为图片生成小红书风格文案，支持拖拽排版和样式编辑，一键保存。",
   "requestFramePermissions": []
 }
