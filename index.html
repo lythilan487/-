@@ -3,7 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script>window.process = { env: {} };</script>
+    <script>
+      window.global = window;
+      window.process = { env: {}, platform: '' };
+      window.addEventListener('error', function(e) {
+        if (document.body) {
+          var errDiv = document.createElement('div');
+          errDiv.style.cssText = 'padding: 20px; color: red; background: white; z-index: 9999; position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: auto; font-family: sans-serif;';
+          errDiv.innerHTML = '<h3>App Error</h3><p>' + e.message + '</p><pre>' + e.filename + ':' + e.lineno + '</pre>';
+          document.body.appendChild(errDiv);
+        }
+      });
+    </script>
     <title>画里有话</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
