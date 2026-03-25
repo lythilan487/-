@@ -1,8 +1,7 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { toPng } from 'html-to-image';
-import { GoogleGenAI } from '@google/genai';
-import { Upload, Download, RefreshCw, Type, Palette, Trash2, Italic, Underline, Strikethrough, Undo2, Redo2, SlidersHorizontal, ChevronRight } from 'lucide-react';
+import { Upload, Download, RefreshCw, Type, Palette, Trash2, Italic, Underline, Strikethrough, Undo2, Redo2, SlidersHorizontal, ChevronRight, Mic, MicOff } from 'lucide-react';
 import { cn } from './lib/utils';
 
 function useUndo<T>(initialPresent: T) {
@@ -69,9 +68,11 @@ const initialImageStyle = {
 export default function App() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isListening, setIsListening] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'font' | 'style' | 'image'>('font');
+  
+  const recognitionRef = useRef<any>(null);
   
   const [appState, setAppState, undo, redo, canUndo, canRedo] = useUndo({
     text: '',
@@ -97,6 +98,48 @@ export default function App() {
   
   const exportRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'zh-CN';
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        setText((prev) => {
+          const newText = prev + transcript;
+          return newText.slice(0, 50);
+        });
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, [setText]);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("您的浏览器不支持语音输入功能，请尝试使用 Chrome 或 Safari。");
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
+
   const processFile = async (file: File) => {
     try {
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -107,7 +150,6 @@ export default function App() {
       });
       setImageFile(file);
       setImageUrl(dataUrl); // Use base64 Data URL to prevent html-to-image CORS/tainted canvas issues
-      generateCopy(dataUrl.split(',')[1], file.type);
     } catch (error) {
       console.error("Error reading file:", error);
       alert("读取图片失败，请重试");
@@ -126,39 +168,6 @@ export default function App() {
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('image/')) {
       processFile(file);
-    }
-  };
-
-  const generateCopy = async (base64Data: string, mimeType: string) => {
-    setIsGenerating(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                data: base64Data,
-                mimeType: mimeType,
-              },
-            },
-            {
-              text: "你是一个小红书爆款文案专家。请分析这张图片，并为其生成一句适合发在小红书的图片文案。要求：字数在30字以内，网感好，吸引人，有情绪价值。直接输出文案，不要任何多余的解释、引号或前缀。",
-            },
-          ],
-        },
-      });
-
-      if (response.text) {
-        setText(response.text.trim().replace(/^["']|["']$/g, ''));
-      }
-    } catch (error) {
-      console.error("Failed to generate copy:", error);
-      alert("生成文案失败，请检查 API Key 配置或稍后重试");
-    } finally {
-      setIsGenerating(false);
     }
   };
 
@@ -348,16 +357,25 @@ export default function App() {
                       </div>
                     </label>
                     <button 
-                      onClick={() => {
-                        if (imageFile && imageUrl) {
-                          generateCopy(imageUrl.split(',')[1], imageFile.type);
-                        }
-                      }}
-                      disabled={isGenerating}
-                      className="text-xs text-red-500 hover:text-red-600 flex items-center gap-1 disabled:opacity-50 transition-colors"
+                      onClick={toggleListening}
+                      className={cn(
+                        "text-xs flex items-center gap-1 transition-colors px-2 py-1 rounded-full",
+                        isListening 
+                          ? "bg-red-100 text-red-600 animate-pulse" 
+                          : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100"
+                      )}
                     >
-                      <RefreshCw className={cn("w-3 h-3", isGenerating && "animate-spin")} />
-                      AI 重新生成
+                      {isListening ? (
+                        <>
+                          <MicOff className="w-3.5 h-3.5" />
+                          停止录音
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-3.5 h-3.5" />
+                          语音输入
+                        </>
+                      )}
                     </button>
                   </div>
                   <textarea
