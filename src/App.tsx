@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { toPng } from 'html-to-image';
-import { Upload, Download, RefreshCw, Type, Palette, Trash2, Italic, Underline, Strikethrough, Undo2, Redo2, SlidersHorizontal, ChevronRight, Mic, MicOff, X } from 'lucide-react';
+import { Upload, Download, RefreshCw, Type, Palette, Trash2, Italic, Underline, Strikethrough, Undo2, Redo2, SlidersHorizontal, ChevronRight, Mic, MicOff, X, RotateCw } from 'lucide-react';
 import { cn } from './lib/utils';
 
 function useUndo<T>(initialPresent: T) {
@@ -64,6 +64,7 @@ const initialImageStyle = {
   contrast: 100,
   saturation: 100,
   aspectRatio: 'original',
+  rotate: 0,
 };
 
 export default function App() {
@@ -99,6 +100,7 @@ export default function App() {
   }, [setAppState]);
   
   const exportRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -128,6 +130,64 @@ export default function App() {
       recognitionRef.current = recognition;
     }
   }, [setText]);
+
+  useEffect(() => {
+    if (!imageUrl || !canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const img = new Image();
+    img.onload = () => {
+      const isRotated = imageStyle.rotate % 180 !== 0;
+      canvas.width = isRotated ? img.height : img.width;
+      canvas.height = isRotated ? img.width : img.height;
+
+      ctx.filter = `brightness(${imageStyle.brightness}%) contrast(${imageStyle.contrast}%) saturate(${imageStyle.saturation}%)`;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((imageStyle.rotate * Math.PI) / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      ctx.restore();
+    };
+    img.src = imageUrl;
+  }, [imageUrl, imageStyle.brightness, imageStyle.contrast, imageStyle.saturation, imageStyle.rotate]);
+
+  const handleDownload = useCallback(async () => {
+    if (exportRef.current === null) return;
+    
+    setIsSaving(true);
+    try {
+      const rect = exportRef.current.getBoundingClientRect();
+      const exportOptions = {
+        cacheBust: true,
+        skipFonts: false,
+        width: rect.width,
+        height: rect.height,
+        style: { margin: '0', padding: '0' }
+      };
+
+      // iOS Safari workaround: Call toPng twice.
+      // The first call forces the browser to load the image into the canvas context.
+      await toPng(exportRef.current, exportOptions);
+      // Small delay to ensure rendering is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const dataUrl = await toPng(exportRef.current, { 
+        ...exportOptions,
+        pixelRatio: 2,
+      });
+      setGeneratedImage(dataUrl);
+    } catch (err) {
+      console.error('Failed to export image', err);
+      alert('生成图片失败，请重试');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [exportRef]);
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
@@ -306,18 +366,15 @@ export default function App() {
                 aspectRatio: imageStyle.aspectRatio === 'original' ? 'auto' : imageStyle.aspectRatio.replace(':', '/'),
               }}
             >
-              <img 
-                src={imageUrl} 
-                alt="Uploaded" 
+              <canvas 
+                ref={canvasRef}
                 className="block pointer-events-none"
-                draggable={false}
                 style={{
                   width: imageStyle.aspectRatio === 'original' ? 'auto' : '100%',
                   height: imageStyle.aspectRatio === 'original' ? 'auto' : '100%',
                   maxWidth: '100%',
                   maxHeight: '100%',
                   objectFit: imageStyle.aspectRatio === 'original' ? 'contain' : 'cover',
-                  filter: `brightness(${imageStyle.brightness}%) contrast(${imageStyle.contrast}%) saturate(${imageStyle.saturation}%)`
                 }}
               />
               {text && (
