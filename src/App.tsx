@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { toPng } from 'html-to-image';
-import { Upload, Download, RefreshCw, Type, Palette, Trash2, Italic, Underline, Strikethrough, Undo2, Redo2, SlidersHorizontal, ChevronRight, Mic, MicOff } from 'lucide-react';
+import { Upload, Download, RefreshCw, Type, Palette, Trash2, Italic, Underline, Strikethrough, Undo2, Redo2, SlidersHorizontal, ChevronRight, Mic, MicOff, X } from 'lucide-react';
 import { cn } from './lib/utils';
 
 function useUndo<T>(initialPresent: T) {
@@ -63,6 +63,7 @@ const initialImageStyle = {
   brightness: 100,
   contrast: 100,
   saturation: 100,
+  aspectRatio: 'original',
 };
 
 export default function App() {
@@ -71,6 +72,7 @@ export default function App() {
   const [isListening, setIsListening] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'font' | 'style' | 'image'>('font');
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   
   const recognitionRef = useRef<any>(null);
   
@@ -176,24 +178,27 @@ export default function App() {
     
     setIsSaving(true);
     try {
-      // html-to-image can sometimes fail on the first pass with custom fonts,
-      // but using base64 images usually solves the main issue.
       const dataUrl = await toPng(exportRef.current, { 
         cacheBust: true,
         pixelRatio: 2,
         skipFonts: false
       });
-      const link = document.createElement('a');
-      link.download = `xiaohongshu-${Date.now()}.png`;
-      link.href = dataUrl;
-      link.click();
+      setGeneratedImage(dataUrl);
     } catch (err) {
       console.error('Failed to export image', err);
-      alert('保存图片失败，请重试');
+      alert('生成图片失败，请重试');
     } finally {
       setIsSaving(false);
     }
   }, [exportRef]);
+
+  const downloadImage = () => {
+    if (!generatedImage) return;
+    const link = document.createElement('a');
+    link.download = `xiaohongshu-${Date.now()}.png`;
+    link.href = generatedImage;
+    link.click();
+  };
 
   const handleClear = () => {
     setImageFile(null);
@@ -278,15 +283,25 @@ export default function App() {
           ) : (
             <div 
               ref={exportRef}
-              className="relative shadow-lg bg-white overflow-hidden flex items-center justify-center"
-              style={{ width: 'fit-content', height: 'fit-content', maxWidth: '100%', maxHeight: '100%' }}
+              className="relative shadow-lg bg-white overflow-hidden"
+              style={{ 
+                display: 'inline-block', 
+                maxWidth: '100%', 
+                maxHeight: '100%' 
+              }}
             >
               <img 
                 src={imageUrl} 
                 alt="Uploaded" 
-                className="max-w-full max-h-[80vh] object-contain block pointer-events-none"
+                className="block pointer-events-none"
                 draggable={false}
                 style={{
+                  maxWidth: '100%',
+                  maxHeight: '80vh',
+                  width: imageStyle.aspectRatio === 'original' ? 'auto' : '1200px',
+                  height: 'auto',
+                  aspectRatio: imageStyle.aspectRatio === 'original' ? 'auto' : imageStyle.aspectRatio.replace(':', '/'),
+                  objectFit: imageStyle.aspectRatio === 'original' ? 'contain' : 'cover',
                   filter: `brightness(${imageStyle.brightness}%) contrast(${imageStyle.contrast}%) saturate(${imageStyle.saturation}%)`
                 }}
               />
@@ -612,6 +627,25 @@ export default function App() {
                 {/* Tab Content: Image */}
                 {activeTab === 'image' && (
                   <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                    {/* Aspect Ratio */}
+                    <div className="space-y-3">
+                      <span className="text-xs text-neutral-500">图片比例</span>
+                      <div className="flex bg-neutral-100 rounded-lg p-1 flex-wrap gap-1">
+                        {['original', '1:1', '3:4', '4:3', '9:16', '16:9'].map(ratio => (
+                          <button
+                            key={ratio}
+                            onClick={() => setImageStyle(s => ({ ...s, aspectRatio: ratio }))}
+                            className={cn(
+                              "flex-1 min-w-[45px] py-1.5 text-xs rounded-md transition-all",
+                              imageStyle.aspectRatio === ratio ? "bg-white shadow-sm font-medium text-neutral-900" : "text-neutral-500 hover:text-neutral-700"
+                            )}
+                          >
+                            {ratio === 'original' ? '原图' : ratio}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Brightness */}
                     <div className="space-y-3">
                       <div className="flex justify-between">
@@ -667,6 +701,47 @@ export default function App() {
         )}
       </main>
       </div>
+
+      {/* Save Image Modal */}
+      {generatedImage && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 sm:p-8 animate-in fade-in duration-200">
+          <button
+            onClick={() => setGeneratedImage(null)}
+            className="absolute top-4 right-4 p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          
+          <div className="text-center mb-6">
+            <h3 className="text-white text-lg font-medium mb-2">生成成功 🎉</h3>
+            <p className="text-white/70 text-sm bg-white/10 px-4 py-2 rounded-full inline-block">
+              👇 请长按下方图片保存到手机相册
+            </p>
+          </div>
+
+          <img 
+            src={generatedImage} 
+            alt="Generated" 
+            className="max-w-full max-h-[60vh] rounded-lg shadow-2xl object-contain"
+          />
+
+          <div className="mt-8 flex gap-4">
+            <button
+              onClick={downloadImage}
+              className="bg-white/10 hover:bg-white/20 text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              电脑端下载
+            </button>
+            <button
+              onClick={() => setGeneratedImage(null)}
+              className="bg-red-500 hover:bg-red-600 text-white px-6 py-2.5 rounded-full text-sm font-medium transition-colors"
+            >
+              完成
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
