@@ -178,10 +178,24 @@ export default function App() {
     
     setIsSaving(true);
     try {
-      const dataUrl = await toPng(exportRef.current, { 
+      const rect = exportRef.current.getBoundingClientRect();
+      const exportOptions = {
         cacheBust: true,
+        skipFonts: false,
+        width: rect.width,
+        height: rect.height,
+        style: { margin: '0', padding: '0' }
+      };
+
+      // iOS Safari workaround: Call toPng twice.
+      // The first call forces the browser to load the image into the canvas context.
+      await toPng(exportRef.current, exportOptions);
+      // Small delay to ensure rendering is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const dataUrl = await toPng(exportRef.current, { 
+        ...exportOptions,
         pixelRatio: 2,
-        skipFonts: false
       });
       setGeneratedImage(dataUrl);
     } catch (err) {
@@ -283,11 +297,13 @@ export default function App() {
           ) : (
             <div 
               ref={exportRef}
-              className="relative shadow-lg bg-white overflow-hidden"
+              className="relative shadow-lg bg-white overflow-hidden flex items-center justify-center"
               style={{ 
-                display: 'inline-block', 
+                width: imageStyle.aspectRatio === 'original' ? 'fit-content' : '100%', 
+                height: imageStyle.aspectRatio === 'original' ? 'fit-content' : '100%', 
                 maxWidth: '100%', 
-                maxHeight: '100%' 
+                maxHeight: '100%',
+                aspectRatio: imageStyle.aspectRatio === 'original' ? 'auto' : imageStyle.aspectRatio.replace(':', '/'),
               }}
             >
               <img 
@@ -296,11 +312,10 @@ export default function App() {
                 className="block pointer-events-none"
                 draggable={false}
                 style={{
+                  width: imageStyle.aspectRatio === 'original' ? 'auto' : '100%',
+                  height: imageStyle.aspectRatio === 'original' ? 'auto' : '100%',
                   maxWidth: '100%',
-                  maxHeight: '80vh',
-                  width: imageStyle.aspectRatio === 'original' ? 'auto' : '1200px',
-                  height: 'auto',
-                  aspectRatio: imageStyle.aspectRatio === 'original' ? 'auto' : imageStyle.aspectRatio.replace(':', '/'),
+                  maxHeight: '100%',
                   objectFit: imageStyle.aspectRatio === 'original' ? 'contain' : 'cover',
                   filter: `brightness(${imageStyle.brightness}%) contrast(${imageStyle.contrast}%) saturate(${imageStyle.saturation}%)`
                 }}
